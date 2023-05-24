@@ -62,26 +62,19 @@ class EmbeddingDict(dict):
 
     def __getitem__(self, __key) -> np.ndarray:
         """Get a word's vector representation."""
-        return self._embedding_matrix[word_to_idx[__key]]
+        return self._embedding_matrix[self._word_to_idx[__key]]
 
 
 ### Training functions ###
 def train_skip_gram(
-    file          : Path | None = None,
-    min_frequency : int         = 100,
-    window_size   : int         = 5,
-    alpha         : int         = 7,
-    embedding_dim : int         = 100,
-    η             : float       = 1e-3,
+    file          : Path  = None,
+    min_frequency : int   = 100,
+    window_size   : int   = 5,
+    alpha         : int   = 7,
+    embedding_dim : int   = 100,
+    η             : float = 1e-3,
 ) -> None:
-    # Drop any words with less than `min_frequency`
-    #
-    # Cycle through the corpus and:
-    #     Treat target words and it's neighbors +- `window_size` as positive examples.
-    #     Randomly sample alpha * more negative samples than positive ones.
-    
-    #     Train a LR classifier to discriminate between the negative and positive examples.
-    #     The weights of this classifier will be our embedding for the target word.
+    """Train a word-to-vector dictionary using the Skip-gram algorithm from Mikolov et. al."""
 
     corpus: list[list[str]] = []
     with open(file, "r", encoding="utf-8") as f:
@@ -97,8 +90,7 @@ def train_skip_gram(
     vocabulary  = list(vocabulary)  # Convert to an ordered collection from a set.
     
     # A poor man's tabular data structure...
-    idx_to_word = {i    : word for i, word in enumerate(vocabulary)}
-    word_to_idx = {word : i    for i, word in enumerate(vocabulary)}
+    word_to_idx = {word : i for i, word in enumerate(vocabulary)}
 
     ### Randomly initialize word vectors ###
     W = np.random.standard_normal(embedding_dim*vocab_count).reshape((embedding_dim, vocab_count))
@@ -107,7 +99,7 @@ def train_skip_gram(
     """Context vectors."""
     
     ### Training ###
-    for i, line in enumerate(corpus):
+    for i, line in enumerate(corpus[:max_lines]):
         for j, target_word in enumerate(line):
             # get context words
             left_context   = line[max(j-window_size,0) : j]
@@ -150,10 +142,11 @@ def train_skip_gram(
             print(f"Similarity between 'rey' and 'reina'        {np.dot(rey, reina):.3f}")
             print(f"Cosine similarity between 'rey' and 'reina' {_cosine_similarity(rey, reina):.3f}")
 
-    # Return the sum of the target and context matrices!
+    # The final embedding matrix can either be `W`, or the sum of `W` and `C`.
+    # Let's use the latter - why not ¯_(ツ)_/¯
     embedding_matrix = W + C
     return EmbeddingDict(embedding_matrix, word_to_idx)
 
 if __name__ == "__main__":
     first_file                    = Path("data\\clean_corpus\\spanish_billion_words\\spanish_billion_words_00")
-    embedding_matrix, word_to_idx = train_skip_gram(first_file)
+    word2vec: EmbeddingDict = train_skip_gram(first_file)
