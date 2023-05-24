@@ -67,11 +67,11 @@ class EmbeddingDict(dict):
 
 ### Training functions ###
 def train_skip_gram(
-    file          : Path  = None,
-    min_frequency : int   = 100,
-    window_size   : int   = 5,
-    alpha         : int   = 7,
-    embedding_dim : int   = 100,
+    file          : Path   = None,
+    min_frequency : int    = 100,
+    window_size   : int    = 5,
+    alpha         : int    = 7,
+    embedding_dim : int    = 100,
     η             : float = 1e-3,
 ) -> None:
     """Train a word-to-vector dictionary using the Skip-gram algorithm from Mikolov et. al."""
@@ -99,7 +99,7 @@ def train_skip_gram(
     """Context vectors."""
     
     ### Training ###
-    for i, line in enumerate(corpus[:max_lines]):
+    for i, line in enumerate(corpus):
         for j, target_word in enumerate(line):
             # get context words
             left_context   = line[max(j-window_size,0) : j]
@@ -148,5 +148,13 @@ def train_skip_gram(
     return EmbeddingDict(embedding_matrix, word_to_idx)
 
 if __name__ == "__main__":
-    first_file                    = Path("data\\clean_corpus\\spanish_billion_words\\spanish_billion_words_00")
-    word2vec: EmbeddingDict = train_skip_gram(first_file)
+    first_file               = Path("data\\clean_corpus\\spanish_billion_words\\spanish_billion_words_00")
+    word2vec : EmbeddingDict = train_skip_gram(first_file)
+
+    print("Similarity between 'boy' and 'girl': %s", word2vec["hijo"] * word2vec["hija"])
+    print("Similarity between 'king' and 'queen': %s", word2vec["hijo"] * word2vec["hija"])
+
+    boy_to_girl   = word2vec["hijo"] - word2vec["hija"]
+    king_to_queen = word2vec["rey"] - word2vec["reina"]
+
+    print("Similarity between the vector boy->girl and king->queen %s", boy_to_girl * king_to_queen)
