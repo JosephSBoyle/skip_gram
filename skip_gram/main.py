@@ -9,6 +9,7 @@ Notes:
 - More out of context ('negative') samples are used during training than in-context ones
 - The selection of negative samples has been slightly simplified to be unweighted. 
 """
+import collections
 from pathlib import Path
 from pprint import pprint
 
@@ -29,31 +30,13 @@ def _load_spanish_billion_word_corpus_single_file(
 ) -> set[str]:
     # 1. Read all the files and construct a vocab of those with `min_frequency` or
     # more occurences. 
-    word_bag: dict[str, int] = dict()  # Multiset
-    
+    word_bag = collections.Counter()
     for line in raw_corpus:
-        words = line.split()
-        
-        for word in words:
-            if word in word_bag:
-                word_bag[word] += 1
-            else:
-                word_bag[word] = 1
+        word_bag.update(line.split())
 
-    keys_to_drop = []
-    for k, v in word_bag.items():
-        if v < min_frequency:
-            keys_to_drop.append(k)
-
-    for k in keys_to_drop:
-        del word_bag[k]
-
-    pprint(word_bag)
-    print(len(word_bag))
-
-    vocabulary = word_bag.keys()
-    return set(vocabulary)
-
+    vocabulary = {word for word, count in word_bag.items() if count >= min_frequency}
+    print(f"Unique words: {len(word_bag)} Vocabulary size: {len(vocabulary)}")
+    return vocabulary
 class EmbeddingDict(dict):
     """Utility wrapper around a regular dict that allows embedding lookup by word."""
     def __init__(self, embedding_matrix: np.ndarray, word_to_idx: dict[str, int]):
@@ -78,13 +61,13 @@ def train_skip_gram(
 
     corpus: list[list[str]] = []
     with open(file, "r", encoding="utf-8") as f:
-        raw_corpus: list[list[str]] = f.readlines()
+        raw_corpus: list[str] = f.readlines()
     
     vocabulary = _load_spanish_billion_word_corpus_single_file(raw_corpus, min_frequency)
     
     for raw_line in raw_corpus:
-        line = [word for word in raw_line.split() if word in vocabulary]
-        corpus.append(line)
+        line_words = [word for word in raw_line.split() if word in vocabulary]
+        corpus.append(line_words)
     
     vocab_count = len(vocabulary)
     vocabulary  = list(vocabulary)  # Convert to an ordered collection from a set.
@@ -111,11 +94,11 @@ def train_skip_gram(
     # For a more rigorous explanation, I highly recommend 'Speech and Language Processing',
     # the relevant chapter can be found here: 
     # https://web.stanford.edu/~jurafsky/slp3/6.pdf
-    for i, line in enumerate(corpus):
-        for j, target_word in enumerate(line):
+    for i, line_words in enumerate(corpus):
+        for j, target_word in enumerate(line_words):
             # Select context words.
-            left_context   = line[max(j-window_size, 0) : j]
-            right_context  = line[j+1: (j+1 + window_size)]
+            left_context   = line_words[max(j-window_size, 0) : j]
+            right_context  = line_words[j+1: (j+1 + window_size)]
             positive_words = left_context + [target_word] + right_context
 
             # For simplicity, assume that the probability of sampling a context / target word is 0.
